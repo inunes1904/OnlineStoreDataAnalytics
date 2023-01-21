@@ -1,0 +1,638 @@
+---
+title: "`r params$doctitle`"
+params:
+  doctitle: "Data Mining/Discovery Techniques"
+author: 
+- Alunos Ivo Nunes n20202567, Gonçalo Bernardo n20202467, André Costa n20202601. 
+- Docente João Caldeira^[Invited Professor. LinkedIn. https://www.linkedin.com/in/joao-carlos-caldeira/], [jcaldeira@uatlantica.pt](mailto:jcaldeira@uatlantica.pt), **Univ. Atlântica**
+date: "`r format(Sys.time(), '%d %B %Y')`"
+header-includes:
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \fancyhead[L]{\includegraphics[width=2.5cm]{ua.jpg}}
+- \fancyfoot[L]{Copyright @ `r format(Sys.time(), '%Y')` - Data Mining/Discovery Techniques}
+- \fancyfoot[C]{}
+- \fancyfoot[R]{\thepage}
+#abstract: This is the abstract.
+output:
+  html_document: 
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+    theme: cosmo
+  html_notebook: 
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+    fig_caption: yes
+    theme: cosmo
+    highlight: default
+  pdf_document: 
+    toc: yes
+    #highlight: espresso
+    fig_caption: yes
+    number_sections: yes
+  word_document:
+    toc: yes
+    toc_depth: '3'
+    number_sections: yes
+subtitle: \ **Segmentação de clientes e análise do cabaz de compras**
+tags:
+- data mining
+- knowledge discovery
+- exploratory data analysis
+- data preprocessing
+- cluster analysis
+- association rules
+---
+
+\newpage
+
+# Environment Setup
+
+
+
+## Install Required Libraries
+```{r setup, eval=FALSE, echo=TRUE}
+install.packages("DataExplorer")
+install.packages("Hmisc")
+install.packages("BBmisc")
+install.packages("vioplot")
+install.packages("moments")
+install.packages("readxl")
+install.packages("datetime")
+install.packages("lubridate")
+install.packages("cluster")
+install.packages("factoextra")
+install.packages("gridExtra")
+install.packages("purrr")
+install.packages("arules")
+install.packages("arulesViz")
+install.packages("data.table") 
+```
+
+
+## Load Required Libraries
+```{r load, echo=TRUE}
+library(DataExplorer)
+library(Hmisc)
+library(BBmisc)
+library(vioplot)
+library(moments)
+library(readxl)
+library(dplyr)
+library(datetime)
+library(lubridate)
+library(factoextra)
+library(cluster)
+library(gridExtra)
+library(purrr)
+library(arules)
+library(arulesViz)
+library(data.table)  
+```
+
+
+```{r echo=FALSE}
+options(scipen = 999)
+```
+
+
+
+# Data Mining/Discovery
+
+## Loading the Dataset(s)
+
+```{r}
+# Lê o ficheiro chamado "Online Retail.xlsx" e coloca os dados na variável "my_data". 
+# Em seguida, o comando "str (my_data)" descreve resumidamente os dados armazenados na variável "my_data", 
+# incluindo o número de observações e colunas, e os nomes e tipos de variáveis.
+my_data <- read_excel("Online Retail.xlsx")
+str(my_data)
+```
+
+
+
+\newpage
+## Exploratory Data Analysis(EDA)
+
+### Getting to Know the Dataset
+
+```{r}
+# Mostra as primeiras 10 linhas do dataset my_data.
+head(my_data, 10)
+```
+
+
+```{r}
+# Mostra as últimas 10 linhas do dataset my_data.
+tail(my_data, 10)
+```
+
+
+
+```{r}
+# Descrição resumida dos dados "my_data", incluindo estatísticas resumidas, como a média, mediana, desvio padrão e quartis para 
+# variáveis numéricas, e contagem e frequência para variáveis categóricas. 
+summary(my_data)
+```
+
+```{r}
+# Visualizar os nomes das colunas.
+plot_str(my_data)
+```
+
+
+```{r}
+# Verificação dos valores negativos.
+boxplot(my_data$Quantity,my_data$UnitPrice)
+```
+
+
+\newpage
+
+# Data Preprocessing
+
+
+## Handling Missing Data
+### Summary of Incomplete Cases(NAs)
+```{r}
+# Contamos aqui todos os NA's existentes na Coluna de CustomerID.
+sum(is.na(my_data$CustomerID))
+
+```
+
+
+
+## Data Transformation
+```{r}
+# Visto que vamos iniciar a manipulação e tratamento, deixaremos iremos guardar a variavel my_data com os dados
+# originais e atribuiremos a outra variavel os dados para podermos efetuar transformações.
+# Removemos os NA's e confirmamos com o sum para verificar que a quantidade de NA's é 0.
+dataset <- my_data
+dataset <- na.omit(dataset)
+sum(is.na(dataset$CustomerID))
+
+```
+
+
+```{r}
+# Verificamos a quantidade de valores negativos nas colunas Quantity e UnitPrice.
+sum(dataset$Quantity<0) 
+sum(dataset$UnitPrice<=0.0)
+```
+
+```{r}
+# Filtramos o conjunto de dados "dataset" onde a quantidade (Quantity) é maior que zero e o preço unitário (UnitPrice) é maior que zero.
+# Vai então remover as linhas onde a quantidade ou preço unitário é negativo ou zero.
+# Depois executamos o sum para confirmar a operação.
+dataset <- filter(dataset, dataset$Quantity > 0, dataset$UnitPrice > 0.0)
+sum(dataset$Quantity<0) 
+sum(dataset$UnitPrice<=0.0)
+```
+
+\newpage
+## Using Correlation Heatmaps
+```{r}
+# Verificar a correlação entre as variáveis do conjunto de dados do "dataset".
+plot_correlation(dataset)
+```
+
+```{r}
+# Confirmação de que não existem valores nulos.
+any(is.null(dataset))
+
+```
+
+
+```{r}
+# Remove todas as linhas do conjunto de dados que contenham valores ausentes (NA).
+# A função "dim()" imprime o número de linhas e colunas do conjunto de dados "dataset".
+
+dataset = na.omit(dataset)
+```
+
+```{r}
+# "unique()" para remover as linhas duplicadas do conjunto de dados "dataset".
+dim(unique(dataset))[1]
+```
+
+
+```{r}
+
+# Cria uma nova coluna chamada "date", no conjunto de dados "dataset", extraída da coluna "InvoiceDate", e seleciona somente a data.
+dataset$date <- sapply(as.character(dataset$InvoiceDate), FUN = function(x) {strsplit(x, split = '[ ]')[[1]][1]})
+# Cria uma nova coluna chamada "date", no conjunto de dados "dataset", extraída da coluna "InvoiceDate", e seleciona somente a tempo.
+dataset$time <- sapply(as.character(dataset$InvoiceDate), FUN = function(x) {strsplit(x, split = '[ ]')[[1]][2]})
+# Cria uma nova coluna chamada "date", no conjunto de dados "dataset", extraída da coluna "InvoiceDate", e seleciona somente o mês.
+dataset$month <- sapply(as.character(dataset$InvoiceDate), FUN = function(x) {strsplit(x, split = '[-]')[[1]][2]})
+# Cria uma nova coluna chamada "date", no conjunto de dados "dataset", extraída da coluna "InvoiceDate", e seleciona somente o ano.
+dataset$year <- sapply(as.character(dataset$InvoiceDate), FUN = function(x) {strsplit(x, split = '[-]')[[1]][1]})
+# Cria uma nova coluna chamada "date", no conjunto de dados "dataset", extraída da coluna "InvoiceDate", e seleciona somente a hora do dia da compra.
+dataset$hourOfDay <- sapply(dataset$time, FUN = function(x) {strsplit(x, split = '[:]')[[1]][1]})
+
+# Função "mutate()" adiciona "TotalSales" ao conjunto de dados "dataset" com os valores calculados, multiplicando "Quantity" e "UnitPrice".
+dataset = mutate(dataset, TotalSales = Quantity*UnitPrice)
+# Nova coluna chamada "dayOfWeek", no conjunto de dados "dataset", com o dia da semana extraído da coluna "InvoiceDate", usando a função "wday()" com o parametro 
+# "label = TRUE", o que retorna o dia da semana como um Char.
+dataset$dayOfWeek <- wday(dataset$InvoiceDate)
+
+```
+
+
+
+```{r}
+# Converter a coluna "Country", "month", "year", "hourOfDay" e "dayOfWeek" em fator, usando a função "as.factor()".
+dataset$Country <- as.factor(dataset$Country)
+dataset$month <- as.factor(dataset$month)
+dataset$year <- as.factor(dataset$year)
+# Altera os níveis da coluna para somente 2010 e 2011 com "levels()".
+levels(dataset$year) <- c(2010,2011)
+hourOfDay <- as.factor(dataset$hourOfDay)
+dataset$dayOfWeek <- as.factor(dataset$dayOfWeek)
+
+```
+
+```{r}
+# Criando uma variável chamada "max_date" e armazenando a data mais recente, presente na coluna "InvoiceDate", utilizando a função "max()" com o parametro "na.rm = TRUE" para remover os valores ausentes.
+max_date <- max(dataset$InvoiceDate, na.rm = TRUE)
+# Função "mutate()" para adicionar uma nova coluna chamada "Diff" ao conjunto de dados "dataset", e preenchendo-a com a diferença, em dias, entre cada data na coluna "InvoiceDate", e a data mais recente armazenada na variável "max_date", utilizando a função "difftime()" com o parametro "units = "days"".
+dataset = mutate(dataset, Diff = difftime(max_date, InvoiceDate, units = "days"))
+# Função "floor()" para arredondar para baixo o valor de cada célula da coluna "Diff".
+dataset$Diff <- floor(dataset$Diff)
+
+```
+
+```{r}
+# Recência, Frequência, Monetário = RFM
+# Novo conjunto de dados chamado "RFM" que agrupa o conjunto de dados "dataset" por "CustomerID", utilizando a função "group_by()" e calculando a frequência (Frequency) de compras de cada cliente, o valor monetário total (Monetary) das compras de cada cliente e a recência (Recency) da última compra de cada cliente, utilizando as funções "n()" "sum()" e "min()" respetivamente.
+RFM <- summarise(group_by(dataset,CustomerID),Frequency = n(), Monetary = sum(TotalSales), Recency = min(Diff))
+# Conversão da coluna "Recency" em tipo numérico, utilizando "as.numeric()".
+RFM$Recency <- as.numeric(RFM$Recency)
+# Substituindo todos os valores ausentes (NA) na coluna "Monetary" por 0, utilizando "RFM$Monetary[is.na(RFM$Monetary)] <- 0".
+RFM$Monetary[is.na(RFM$Monetary)] <- 0
+# "summary()" Resumo estatístico das colunas "Frequency", "Monetary" e "Recency".
+summary(RFM)
+
+
+```
+```{r}
+# Gráfico de correlação entre Frequency,  Monetary e  Recency.  
+plot_correlation(RFM)
+```
+
+
+```{r}
+# Criação de um gráfico de barras intitulado “2010 vs 2011”, com o dataset especificado. O eixo “X” representa os anos indicados e o “Y” as transações.
+ggplot(dataset, aes(year)) + geom_bar(aes(fill = "year")) + labs(title = "2010 vs 2011", x = "Ano", y = "Transações") + guides(fill = FALSE) + scale_x_discrete(labels = c("2010" = "2010", "2011" = "2011")) + theme_bw() 
+```
+```{r}
+# Criação da tabela “Transactions_per_Country”. Primeiro é aplicado o group_by (dataset, Country) para agrupar as transações por país.
+# Em seguida, é aplicado o summarise para contar o número de transações por país.
+# Depois, é aplicado o arrange para ordenar a tabela de forma decrescente, pelo número de transações.
+# Por fim, é aplicado o top_n para selecionar os 10 países com o maior número de transações, sendo as colunas da tabela renomeadas para "Country" e "Number of Transactions".
+Transactions_per_Country <- top_n(arrange(summarise(group_by(dataset, Country), 'Number of Transcations' = n()), desc(`Number of Transcations`)), 10)
+names(Transactions_per_Country) <- c("Country", "Number of Transactions")
+
+# Criação do gráfico de barras  "5 melhores Países por número de transações”, com os rótulos "Países" e "Número de Transações" para os eixos x e y,
+# respetivamente, exibindo os 5 primeiros países com o maior número de transações.
+Transaction_per_Country_plot <- ggplot(head(Transactions_per_Country,5), aes(x = reorder(Country,-`Number of Transactions`), y = `Number of Transactions`)) + geom_bar(stat = 'identity', fill = "Brown") +
+  geom_text(aes(label = `Number of Transactions`)) +
+  ggtitle('5 melhores Países por número de transações') + xlab('Países') +
+  ylab('Número de Transações') +
+  theme_bw() 
+print(Transaction_per_Country_plot)
+```
+
+```{r}
+# Criação do gráfico de barras  "Receita por dia da Semana", com os rótulos "Dia da Semana" e "Receita (€)" para os eixos x e y, respetivamente.
+# Primeiro, é aplicado o group_by(dataset, dayOfWeek) para agrupar as transações por dia da semana.
+# Depois, é aplicado o summarise para somar as vendas totais, por dia da semana.
+# Aplicando o ggplot, o gráfico é criado. Aplicando o geom_bar as barras do gráfico são desenhadas e o parametro stat = 'identity' mostra a receita total como valores absolutos.
+# O objetivo deste gráfico é mostrar a receita total, por dia da semana, ajudando desta forma a percebermos quais são os dias da semana que geram mais receita.
+suppressWarnings(ggplot(summarise(group_by(dataset, dayOfWeek), revenue = sum(TotalSales)), aes(x = dayOfWeek, y = revenue)) + geom_bar(stat = 'identity', fill = 'Brown') + labs(x = 'Dia da Semana', y = 'Receita Euro', title = 'Receita por dia da Semana') + theme_bw())
+```
+
+```{r}
+# Criação do gráfico de barras "Receita por mês de determinado ano", com os rótulos "Mês" e "Receita (€)" para os eixos x e y, respetivamente.
+# Primeiro, é aplicado o group_by(dataset, month) para agrupar as transações por mês.
+# Depois, é aplicado o summarise para somar as vendas totais por mês.
+# Aplicando o ggplot, o gráfico é criado. Aplicando o geom_bar as barras do gráfico são desenhadas e o parametro stat = 'identity' mostra a receita total como valores absolutos.
+# Este gráfico mostra a receita total, por mês, de determinado ano, que ajuda a entender quais os meses que geram mais receita.
+suppressWarnings(ggplot(summarise(group_by(dataset, month), revenue = sum(TotalSales)), aes(x = month, y = revenue)) + geom_bar(stat = 'identity', fill = 'Brown') + labs(x = 'Mês', y = 'Receita Euro', title = 'Receita por mês de determinado ano') + theme_bw())
+```
+
+```{r}
+# Criação do gráfico de barras "Transacoes por hora do dia", com os rótulos "Hora do Dia" e "Transações" para os eixos x e y, respetivamente.
+# Primeiro, é aplicado o group_by(dataset, hourOfDay) para agrupar as transações por hora do dia.
+# Depois, é aplicado o summarise para contar o número de transações distintas, por hora do dia, utilizando n_distinct(InvoiceNo).
+# Aplicando o ggplot, o gráfico é criado. Aplicando o geom_bar as barras do gráfico são desenhadas e o parametro stat = 'identity' mostra o número de transações distintas como valores absolutos.
+# O objetivo deste gráfico é mostrar o número de transações distintas, por hora do dia, o que ajuda a entender a que horas as transações são mais frequentes.
+suppressWarnings(ggplot(summarise(group_by(dataset, hourOfDay), transactions = n_distinct(InvoiceNo)), aes(x = hourOfDay, y = transactions)) + geom_bar(stat = 'identity', fill = "Brown") + labs(x = 'Hora do Dia', y = 'Transações Euros', title = 'Transacoes por hora do dia') + theme_bw())
+```
+
+
+## Cluster Analysis
+```{r}
+# Criação do dataframe “RFM”, a partir de uma variável “RFM” já existente.
+# De seguida, são definidos os nomes das linhas do dataframe, como o valor da coluna "CustomerID" do mesmo, sendo depois removida a primeira coluna do dataframe.
+# Por fim, os valores do dataframe são escalados e o resultado é guardado num novo dataframe, chamado “rfm_scaled”.
+RFM <- data.frame(RFM)
+row.names(RFM) <- RFM$CustomerID
+RFM <- RFM[,-1]
+RFM_scaled <- scale(RFM) 
+RFM_scaled <- data.frame(RFM_scaled)
+
+# Utilização da função "fviz_nbclust”, para visualizar o número ideal de clusters para o dataframe “RFM_scaled”, utilizando o algoritmo "kmeans" e o método "wss" (soma dos quadrados dentro do grupo).
+# É adicionada uma linha vertical ao gráfico, na posição “x = 3”, que é utilizada como referência para comparar o número de clusters sugeridos pelo gráfico, com outros valores.
+fviz_nbclust(RFM_scaled, kmeans, method = "wss", linecolor = "Brown") + geom_vline(xintercept = 3, linetype = 2)
+
+```
+
+
+```{r}
+# Utilização da função "fviz_nbclust”, para visualizar o grupo de dados, juntamente com o algoritmo "kmeans”, aplicado aos dados do dataframe "RFM_scaled".
+# O método de avaliação utilizado é o "silhouette”.
+fviz_nbclust(RFM_scaled, kmeans, method = "silhouette", linecolor = "Brown") 
+```
+```{r}
+# Utilização da função "kmeans" para agrupar os dados "RFM_scaled" em 3 clusters. O número de vezes que o algoritmo é iniciado a partir de uma configuração aleatória é 25, definido pelo argumento "nstart”. A saída é guardada na variável "k3".
+k3 <- kmeans(RFM_scaled, centers = 3, nstart = 25)
+# Utilização da função "kmeans" para agrupar os dados "RFM_scaled" em 2 clusters. O número de vezes que o algoritmo é iniciado a partir de uma configuração aleatória é 25, definido pelo argumento "nstart”. A saída é guardada na variável "k2”.
+k2 <- kmeans(RFM_scaled, centers = 2, nstart = 25)
+# Utilização da função "kmeans" para agrupar os dados "RFM_scaled" em 4 clusters. O número de vezes que o algoritmo é iniciado a partir de uma configuração aleatória é 25, definido pelo argumento "nstart”. A saída é guardada na variável "k4”.
+k4 <- kmeans(RFM_scaled, centers = 4, nstart = 25)
+
+# Utilização da função "fviz_cluster" para visualizar o grupo de dados armazenado na variável "k3”. É utilizada, igualmente, a geometria "point" para representar os pontos dos dados.
+# O dataframe utilizado é o "RFM_scaled" e o tamanho dos pontos é definido como 0,2. Além disso, é adicionado o título "k = 3" à visualização.
+fviz_cluster(k3, geom = "point", data = RFM_scaled, pointsize = 0.2) + ggtitle("k = 3") + theme_bw()
+
+```
+```{r}
+# Utilização da função "fviz_cluster" para visualizar o grupo de dados armazenado na variável "k4”. É utilizada, igualmente, a geometria "point" para representar os pontos dos dados.
+# O dataframe utilizado é o "RFM_scaled" e o tamanho dos pontos é definido como 0,2. Além disso, é adicionado o título "k = 4" à visualização.
+fviz_cluster(k4, geom = "point", data = RFM_scaled, pointsize = 0.2) + ggtitle("k = 4") + theme_bw()
+```
+
+```{r}
+# Utilização da função "fviz_cluster" para visualizar o grupo de dados guardado na variável "k2", utilizando os dados do dataframe "RFM_scaled".
+# O tipo de elipse utilizado para representar os clusters é o "convex”, e o argumento "repel" está definido como "T" (verdadeiro), o que faz com que os rótulos sejam afastados para evitar sobreposição.
+fviz_cluster(k2, data=RFM_scaled, ellipse.type = "convex", repel = T)
+```
+```{r}
+# Utilização da função "fviz_cluster" para visualizar o grupo de dados guardado na variável "k3", utilizando os dados do dataframe "RFM_scaled".
+# O tipo de elipse utilizado para representar os clusters é o "convex”, e o argumento "repel" está definido como "T" (verdadeiro), o que faz com que os rótulos sejam afastados para evitar sobreposição.
+fviz_cluster(k3, data=RFM_scaled, ellipse.type = "convex", repel = T)
+```
+```{r}
+# Utilização da função "fviz_cluster" para visualizar o grupo de dados guardado na variável "k4", utilizando os dados do dataframe "RFM_scaled".
+# O tipo de elipse utilizado para representar os clusters é o "convex”, e o argumento "repel" está definido como "T" (verdadeiro), o que faz com que os rótulos sejam afastados para evitar sobreposição.
+fviz_cluster(k4, data=RFM_scaled, ellipse.type = "convex", repel = T)
+```
+
+```{r}
+# Utilização da função "silhouette”, para calcular a medida da silhueta para cada ponto do dado, comparando a semelhança de um ponto dentro do seu cluster, com a semelhança desse ponto com os outros clusters.
+# Utilização da função "fviz_silhouette” para visualizar esses valores de silhueta. O resultado é uma visualização que mostra a distribuição dos valores de silhueta para cada cluster, onde os valores próximos de 1 indicam que os pontos estão bem agrupados, e os valores próximos de -1 indicam que os pontos estão mal agrupados.
+
+# Avaliar e visualizar o quão bem os dados do dataframe "RFM_scaled" estão agrupados no modelo armazenado na variável "k3".
+sil <- silhouette(k3$cluster, dist(RFM_scaled))
+fviz_silhouette(sil)
+```
+```{r}
+# Avaliar e visualizar o quão bem os dados do dataframe "RFM_scaled" estão agrupados no modelo armazenado na variável "k4".
+sil <- silhouette(k4$cluster, dist(RFM_scaled))
+fviz_silhouette(sil)
+```
+```{r}
+# Avaliar e visualizar o quão bem os dados do dataframe "RFM_scaled" estão agrupados no modelo armazenado na variável "k2".
+sil <- silhouette(k2$cluster, dist(RFM_scaled))
+fviz_silhouette(sil)
+```
+
+
+
+```{r}
+# Criação de uma nova tabela com os dados do dataframe "RFM”. É adicionada uma coluna "ClusterId" com os identificadores de cluster gerados pelo modelo armazenado na variável "k3".
+
+# A função "cbind" é utilizada para combinar as colunas do dataframe "RFM" e os identificadores de cluster.
+res <- cbind(RFM, ClusterId = k3$cluster)
+# A função "as.data.frame" é utilizada para converter a tabela combinada para um dataframe. A saída é guardada na variável "res".
+res <- as.data.frame(res)
+# Utilização da biblioteca “ggplot2” para criar um gráfico, que compara as três diferentes colunas abaixo indicadas, entre os diferentes clusters armazenados na coluna "ClusterId" do dataframe "res".
+# O argumento "group" é utilizado para agrupar os dados, de acordo com o “ClusterId”, e o argumento "fill" é utilizado para colorir os gráficos, de acordo com o “ClusterId”.
+# A função "geom_boxplot" é utilizada para criar o gráfico, em formato de caixa, e o argumento "show.legend" é definido como "FALSE" para ocultar a legenda.
+# A função "scale_fill_brewer" é utilizada para definir o conjunto de cores "Reds" para os clusters.
+
+# A função “ggplot” é utilizada para especificar o dataframe "res" como fonte de dados, e mapear as colunas "ClusterId" e "Frequency" para o eixo x e y respetivamente.
+a <- ggplot(res, aes(x = ClusterId, y = Frequency, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_bw() + scale_fill_brewer(palette = "Reds") 
+# A função “ggplot” é utilizada para especificar o dataframe "res" como fonte de dados, e mapear as colunas "ClusterId" e "Monetary" para o eixo x e y respetivamente.
+b <- ggplot(res, aes(x = ClusterId, y = Monetary, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_bw() + scale_fill_brewer(palette = "Reds")
+# A função “ggplot” é utilizada para especificar o dataframe "res" como fonte de dados, e mapear as colunas "ClusterId" e "Recency" para o eixo x e y respetivamente.
+c <- ggplot(res, aes(x = ClusterId, y = Recency, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_bw() + scale_fill_brewer(palette = "Reds")
+# Utilização da função "grid.arrange" que organiza os gráficos "a", "b" e "c" numa tabela com 3 colunas.
+grid.arrange(a,b,c, ncol = 3)
+```
+
+```{r}
+# Utilização da função "fviz_nbclust" para visualizar o grupo de dados do dataframe “RFM_scaled”, e utilizando o método  "hcut" e a medida "wss" para determinar o número ideal de clusters.
+# É adicionada uma linha vertical com interceção em 3, utilizando a função "geom_vline" e o tipo de linha 2.
+fviz_nbclust(RFM_scaled, FUN = hcut, method = "wss", linecolor = "Brown") + geom_vline(xintercept = 3, linetype = 2) + theme_bw()
+```
+
+
+```{r}
+# Utilização da função "fviz_nbclust" para visualizar o grupo de dados do dataframe “RFM_scaled”, e utilizando o método "hcut" e a medida "silhouette" para determinar o número ideal de clusters.
+fviz_nbclust(RFM_scaled, FUN = hcut, method = "silhouette", linecolor = "Brown") + theme_bw()
+```
+## Hierarchical Clustering
+
+```{r}
+
+#HC aglomerante com hclust. Primeiro calculamos os valores dissimilares com dist e depois alimentamos estes valores com hclust e especificamos o método de aglomeração a utilizar (isto é, "complete", "average", "single", "ward.D2"). Em seguida, traçamos o dendrograma.
+
+euclidian_dist <- dist(RFM_scaled, method = "euclidean")
+
+
+hc1 <- hclust(euclidian_dist, method = "single" )
+
+hc2 <- hclust(euclidian_dist, method = "complete" )
+
+hc3 <- hclust(euclidian_dist, method = "ward.D2" )
+
+hc4 <- hclust(euclidian_dist, method = "average" )
+
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+
+ac <- function(x) {
+  agnes(RFM_scaled, method = x)$ac
+}
+map_dbl(m, ac)
+```
+
+```{r}
+# Utilização da biblioteca "dendextend" para transformar o objeto "hc2" num dendrograma.
+# De seguida, atribui-se as cores para as ramificações do dendrograma, com base em 3 grupos (k = 3), utilizando a função "color_branches”.
+# Por fim, realiza-se o dendrograma com as cores atribuídas.
+library(dendextend)
+hc2 <- as.dendrogram(hc2)
+cd = color_branches(hc2,k = 3)
+plot(cd)
+```
+```{r}
+# Utilização da biblioteca "dendextend" para transformar o objeto "hc3" num dendrograma.
+# De seguida, atribui-se as cores para as ramificações do dendrograma, com base em 3 grupos (k = 3), utilizando a função "color_branches”.
+# Por fim, realiza-se o dendrograma com as cores atribuídas.
+hc3 <- as.dendrogram(hc3)
+cd = color_branches(hc3,k = 3)
+plot(cd)
+```
+```{r}
+# Utilização da biblioteca "dendextend" para transformar o objeto "hc3" num dendrograma.
+# De seguida, atribui-se as cores para as ramificações do dendrograma, com base em 3 grupos (k = 3), utilizando a função "color_branches”.
+# Por fim, realiza-se o dendrograma com as cores atribuídas.
+hc3 <- as.dendrogram(hc3)
+cd = color_branches(hc3,k = 3)
+plot(cd)
+```
+
+```{r}
+# À função "ward.clust" é atribuído o valor de “cutree” do agrupamento hierárquico (hc3), para 3 grupos.
+# De seguida, as colunas "RFM" e "ClusterId" são adicionadas ao "res1”, sendo convertidas para um dataframe.
+ward.clust = cutree(hc3,k = 3)
+res1 <- cbind(RFM, ClusterId = ward.clust)
+res1 <- as.data.frame(res1)
+# Criação de um gráfico, utilizando a biblioteca “ggplot2”, e utilizando os dados do dataframe "res1" e mapeando as colunas "ClusterId" (eixo x) e "Frequency" (eixo y) para o gráfico.
+# São agrupados os dados pelo "ClusterId" e as caixas do gráfico são preenchidas com o conjunto de cores "Reds”, de acordo com o “ClusterId”.
+# É utilizado um tema simples e não é exibida legenda.
+a <- ggplot(res1, aes(x = ClusterId, y = Frequency, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_minimal() + scale_fill_brewer(palette = "Reds") 
+# Criação de um gráfico, utilizando a biblioteca “ggplot2”, e utilizando os dados do dataframe "res1" e mapeando as colunas "ClusterId" (eixo x) e "Monetary" (eixo y) para o gráfico.
+# São agrupados os dados pelo "ClusterId" e as caixas do gráfico são preenchidas com o conjunto de cores "Reds”, de acordo com o “ClusterId”.
+# É utilizado um tema simples e não é exibida legenda.
+b <- ggplot(res1, aes(x = ClusterId, y = Monetary, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_minimal() + scale_fill_brewer(palette = "Reds")
+# Criação de um gráfico, utilizando a biblioteca “ggplot2”, e utilizando os dados do dataframe "res1" e mapeando as colunas "ClusterId" (eixo x) e "Recency" (eixo y) para o gráfico.
+# São agrupados os dados pelo "ClusterId" e as caixas do gráfico são preenchidas com o conjunto de cores "Reds”, de acordo com o “ClusterId”.
+# É utilizado um tema simples e não é exibida legenda.
+c <- ggplot(res1, aes(x = ClusterId, y = Recency, group = ClusterId, fill = as.factor(ClusterId))) + 
+  geom_boxplot(show.legend = FALSE) + theme_minimal() + scale_fill_brewer(palette = "Reds")
+# Utilização da função "grid.arrange" que organiza os gráficos "a", "b" e "c" numa tabela com 3 colunas.
+grid.arrange(a,b,c, ncol = 3)
+```
+```{r}
+# Utilização da função "fviz_cluster" para visualizar os resultados do grupo “K-means”, com 3 clusters (k3), no conjunto de dados do dataframe “RFM_scaled”.
+# O parametro "geom" é configurado como "point" para exibir cada ponto de dados num gráfico de dispersão.
+# O título do gráfico é definido como "K-means Clustering”, usando a função "ggtitle".
+fviz_cluster(k3, data = RFM_scaled, geom = "point") + ggtitle("K-means Clustering")
+# Visualização dos clusters gerados pelo algoritmo de agrupamento hierárquico "ward”, utilizando os dados do dataframe "RFM_scaled”.
+# A função "fviz_cluster" é utilizada para exibir os clusters como pontos.
+# O título do gráfico é "Hierarchical Clustering".
+fviz_cluster(list(data = RFM_scaled, cluster = ward.clust), geom = "point") + ggtitle("Hierarchical Clustering")
+```
+```{r}
+#K-means
+# Agrupamento dos dados "res” pelo id de clusters "res$ClusterId”, e calculando a média dos valores para cada grupo.
+# A função "aggregate" é usada para agrupar os dados e calcular a média, e a "by" é usada para especificar o grupo de colunas pelo qual os dados devem ser agrupados.
+aggregate(res,by = list(res$ClusterId),FUN = mean)
+```
+```{r}
+#Hierarchical
+# Agrupamento dos dados "res1” pelo id de clusters "res1$ClusterId”, e calculando a média dos valores para cada grupo.
+# A função "aggregate" é usada para agrupar os dados e calcular a média, e a "by" é usada para especificar o grupo de colunas pelo qual os dados devem ser agrupados.
+aggregate(res1,by = list(res1$ClusterId),FUN = mean)
+```
+
+
+
+\newpage
+
+
+## Association Rules
+```{r, warning = FALSE}
+# O comando "str(dataset)" exibe as informações estruturais sobre o dataset.
+# De seguida, é criada uma variável chamada "united_kingdom”, que é uma cópia do dataset, e utiliza o pipe operator %>% e a função "mutate" para adicionar uma nova coluna chamada "InvoiceDate”, com as data formatadas como datetime.
+# A função "as.datetime" é utilizada para formatar a coluna de data, de acordo com o parametro '%Y-%m-%d %H:%M:%S’.
+str(dataset)
+united_kingdom <- dataset %>%
+ mutate(InvoiceDate = as.datetime(InvoiceDate, '%Y-%m-%d %H:%M:%S')) 
+
+# Criação de uma nova variável chamada "invoiced_items" que contém informações sobre os itens faturados, ao longo de várias etapas:
+# 1 - Utilização do pipe operator %>% para aplicar as funções "group_by", "select" e "distinct" para agrupar os dados pelo número da fatura "InvoiceNo" e selecionar somente as colunas "InvoiceNo" e "Description", e remover todas as linhas duplicadas.
+# 2 - Utilização da função "setDT" para converter o conjunto de dados num objeto do tipo data.table.
+# 3 - Utilização da função "dcast" para transformar os dados numa tabela de contagem, com linhas como a InvoiceNo e colunas como as descrições de itens distintas. O primeiro parametro é o conjunto de dados, seguido de uma fórmula com a coluna de identificação das linhas (InvoiceNo) e colunas (rowid(InvoiceNo)).
+# 4 - Utilização do "select" para remover a coluna "InvoiceNo”.
+# Por fim, temos uma tabela com linhas como o número de fatura e as colunas como as descrições de itens distintos e os suas respetivas quantidades.
+invoiced_items <- dcast(setDT(united_kingdom %>% group_by(InvoiceNo) %>% select(InvoiceNo, Description) %>% distinct(Description, .keep_all = TRUE)), InvoiceNo~rowid(InvoiceNo)) %>%
+ select(!InvoiceNo)
+# O conteúdo da variável "invoiced_items" é salvo num ficheiro CSV chamado "invoiced_items.csv".
+# O ficheiro CSV não tem cabeçalho, aspas e os valores em falta aparecem como uma string vazia, graças aos parâmetros "quote = FALSE”, "row.names = FALSE”, "col.names = FALSE" e "na = ‘’”.
+write.csv(invoiced_items, 'invoiced_items.csv', quote = FALSE, row.names = FALSE, col.names = FALSE, na = '')
+# Leitura do ficheiro 'invoiced_items.csv’, sendo o mesmo guardado numa variável chamada 'transaction'.
+# O formato especificado é 'basket' e o separador de colunas é ','.
+suppressWarnings(transaction <- read.transactions('invoiced_items.csv', format = 'basket', sep = ','))
+```
+
+
+```{r}
+# A função "itemFrequencyPlot" gera um gráfico de frequência de itens a partir de uma transação de dados.
+# O parâmetro "transaction" é a transação de dados que será utilizada para gerar o gráfico.
+# O parâmetro "topN" especifica o número de itens mais frequentes a serem exibidos no gráfico.
+# O parâmetro "type" especifica o tipo de frequência a ser exibida no gráfico, que pode ser "absolute" (absoluta) ou "relative" (relativa).
+itemFrequencyPlot(transaction, topN = 10, type = 'absolute')
+```
+```{r}
+# A função "apriori" é utilizada para encontrar regras de associação nos dados da transação.
+# O parâmetro "transaction" é a transação de dados que será utilizada para encontrar as regras de associação.
+# O parâmetro "parameter" é uma lista de parâmetros adicionais que são utilizados para especificar os critérios de suporte, confiança e tamanho máximo das regras.
+# O suporte é especificado com "supp" e é definido como 0.01, a confiança é especificada com "conf" e é definida como 0.85, e o tamanho máximo das regras é especificado com "maxlen" e é definido como 3.
+# As regras encontradas são guardadas na variável "rules".
+rules <- apriori(transaction, parameter = list(supp = 0.01, conf = 0.85, maxlen = 3))
+# A função "sort" é utilizada para classificar as regras de associação encontradas anteriormente.
+# O parâmetro "rules" é a lista de regras de associação encontradas anteriormente.
+# O parâmetro "by" é usado para especificar como as regras devem ser classificadas. Neste caso é "confidence" (confiança).
+# O parâmetro "decreasing" é usado para especificar se a classificação deve ser em ordem decrescente ou crescente. Neste caso é "TRUE" (verdadeiro), o que indica que as regras serão classificadas em ordem decrescente, de acordo com o seu nível de confiança.
+rules <- sort(rules, by = 'confidence', decreasing = TRUE)
+# Gráfico do parâmetro "rules".
+plot(rules)
+```
+```{r}
+# Realização do parâmetro "rules", em formato de gráfico.
+plot(rules, method = 'graph')
+```
+```{r}
+inspect(sort(rules))
+```
+
+
+# Conclusões
+
+Os clientes do Cluster 3 são os clientes com elevado volume de transacções, são compradores frequentes, e compradores que voltam recorrentemente em comparação com outros clientes, por isso são os mais importantes do ponto de vista comercial.
+Os clientes do Cluster 2 são os clientes com volume médio de transacções, em comparação com os melhores e os clientes fracos, sendo que são em termos de quantidade mais do que os melhores diria que a grosso modo tanto os clientes do Cluster 2 bem como os clientes do Cluster 3 serão os mais importantes para o negócio.
+Os clientes do Cluster 1 são os clientes com menor quantidade de transacções, são compradores pouco frequentes, e são compradores que voltam menos recorrentemente, portanto, menos importantes do ponto de vista comercial.
+ 
+Hierárquico (3 Clusters)
+Os clientes do Cluster 3 são os clientes com elevado volume de transacções, são compradores frequentes, e compradores que voltam recorrentemente em comparação com outros clientes, por isso os mais importantes do ponto de vista comercial.
+Os clientes do Cluster 1 são os clientes com volume médio de transacções, em comparação com os melhores e os clientes fracos, sendo que são em termos de quantidade mais do que os melhores, diria que de grosso modo os clientes do Cluster 1 bem como os clientes do cluster 3 serão os mais importantes para o negócio.
+Os clientes do Cluster 2 são os clientes com menor quantidade de transacções, são compradores pouco frequentes, que voltam menos recorrentemente, portanto, menos importantes do ponto de vista comercial.
+
+Sintetisando nas conclusões iniciais dos Clusters, achou-se que os Clientes estariam divididos entre Clientes Bons, Médios e Maus. No entanto após análise profunda o que é um mau cliente para o negócio? 
+Qualquer pessoa que efetue uma compra no negócio é para nós importante e por consequência sendo o nosso principal objetivo vender o máximo de artigos possível, é lógico que para nós.  Após uma análise mais profunda percebeu-se que a segmentação realizada anteriormente deixava de fazer qualquer sentido.
+Decidiu-se então padronizá-los por tipo de clientes e chegámos à conclusão de que o cluster 3 são as nossas “whales”, ou seja, os nossos melhores clientes aqueles que compram mais, com maior frequência e maior taxa de regresso à nossa loja. Atribuímos a estes um nível de importância 3 com a tentativa de os manter, não os esquecendo nunca, mas uma vez que já se encontram fidelizados, elaboramos campanhas mais esporádicas. Nos Clusters 2 no K-Means e 1 no Hierárquico de baixa taxa de regresso à loja, mas de alto valor monetário, notou-se que já foram clientes valiosos, mas desde então pararam. Chamámos-lhes de “Antigos”. Temos de promover arduamente o seu regresso utilizando possivelmente campanhas de loyalty e exclusivas para esta segmentação, obviamente não cometendo desigualdade relativamente ao setor anterior. Atribuímos a estes um nível de importância 1, tornando-se os mais importantes dos 3 Clusters. Quanto aos últimos Clusters 1 no K-Means e 2 no Hierárquico, chamaram-se de “Novos” pois são normalmente pessoas com alta taxa de regresso e baixa frequência. É um padrão de quem ainda se encontra a “avaliar” o terreno e ainda não está fidelizado, no entanto, achamos que um acompanhamento direcionado pode convertê-los em clientes repetidos, ou até quem sabe em “whales”, considerou-se que estes últimos teriam um nível de importância 2. Os níveis 1, 2 e 3 são uma escala de importância sendo 1 o mais importante e o 3 o menos importante.
+ 
+Relativamente á associação criámos um novo ficheiro csv filtrado por País para podermos perceber pelo mesmos quais são as associações de produtos efetuadas.
+
+Os 5 primeiros resultados da tabela com um IC de 85% ou superior são os seguintes:
+
+Se comprar {PINK REGENCY TEACUP AND SAUCER, ROSES REGENCY TEACUP AND SAUCER}	então compra =>	{GREEN REGENCY TEACUP AND SAUCER}
+Se comprar {PINK REGENCY TEACUP AND SAUCER, REGENCY CAKESTAND 3 TIER}	então compra =>	{GREEN REGENCY TEACUP AND SAUCER}
+Se comprar {PINK REGENCY TEACUP AND SAUCER, REGENCY CAKESTAND 3 TIER}	então compra =>	{ROSES REGENCY TEACUP AND SAUCER}
+Se comprar {SET 3 RETROSPOT TEA} então compra => {SUGAR}
+Se comprar {SUGAR} então compra	=>	{SET 3 RETROSPOT TEA}
+
+Podemos utilizar esta associação para reforçar a compra junto dos clientes, relembrando que estes produtos comprados em conjunto terão vantagens monetárias para os mesmos, reforçando assim a fidelização e a compra.
+
